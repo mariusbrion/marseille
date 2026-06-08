@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Cartographie Thématique Avancée</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; background-color: #f4f3f0; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="data.js"></script>
+    <script>
+        const map = L.map('map').setView([43.3, 5.4], 12);
+
+        const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        const overlayMaps = {};
+        const bounds = L.latLngBounds();
+
+        for (const [layerName, layerInfo] of Object.entries(layersData)) {
+            const geojsonData = layerInfo.geojson;
+
+            if (geojsonData.features && geojsonData.features.length > 0) {
+                
+                const leafletLayer = L.geoJson(geojsonData, {
+                    // Application dynamique des styles injectés par entité
+                    style: function(feature) {
+                        const s = feature.properties && feature.properties._leaflet_style;
+                        if (s) {
+                            return {
+                                color: s.color,
+                                fillColor: s.fillColor,
+                                fillOpacity: s.hasFill ? s.fillOpacity : 0,
+                                weight: s.hasStroke ? s.weight : 0,
+                                opacity: s.hasStroke ? s.opacity : 0
+                            };
+                        }
+                        return {};
+                    },
+                    pointToLayer: function(feature, latlng) {
+                        const s = feature.properties && feature.properties._leaflet_style;
+                        return L.circleMarker(latlng, {
+                            radius: 6,
+                            fillColor: s ? s.fillColor : "#3388ff",
+                            color: s ? (s.hasStroke ? s.color : "transparent") : "#ffffff",
+                            weight: s ? s.weight : 1.5,
+                            opacity: s ? s.opacity : 1,
+                            fillOpacity: s ? s.fillOpacity : 0.8
+                        });
+                    },
+                    onEachFeature: function (feature, layer) {
+                        if (feature.properties) {
+                            let popupContent = '<table style="border-collapse: collapse; font-family: sans-serif; font-size: 12px;">';
+                            for (const [key, value] of Object.entries(feature.properties)) {
+                                // Masquer la clé technique de style du popup de l'interface
+                                if (key === "_leaflet_style") continue;
+                                popupContent += `<tr><td style="padding: 4px; font-weight: bold; border-bottom: 1px solid #eee; color: #555;">${key} :</td><td style="padding: 4px; border-bottom: 1px solid #eee; color: #000;">${value}</td></tr>`;
+                            }
+                            popupContent += '</table>';
+                            layer.bindPopup(popupContent);
+                        }
+                    }
+                });
+
+                leafletLayer.addTo(map);
+                overlayMaps[layerName] = leafletLayer;
+                bounds.extend(leafletLayer.getBounds());
+            }
+        }
+
+        L.control.layers({"Carto Voyager": voyager}, overlayMaps, {collapsed: false}).addTo(map);
+
+        if (bounds.isValid()) {
+            map.fitBounds(bounds);
+        }
+    </script>
+</body>
+</html>

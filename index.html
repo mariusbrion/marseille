@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Cartographie Interactive</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; background-color: #f4f3f0; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script src="data.js"></script>
+    
+    <script>
+        const map = L.map('map').setView([44.837, -0.579], 12);
+
+        const voyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        const overlayMaps = {};
+        const bounds = L.latLngBounds();
+
+        for (const [layerName, layerInfo] of Object.entries(layersData)) {
+            const geojsonData = layerInfo.geojson;
+            const layerColor = layerInfo.color;
+
+            if (geojsonData.features && geojsonData.features.length > 0) {
+                
+                const leafletLayer = L.geoJson(geojsonData, {
+                    style: function(feature) {
+                        return {
+                            color: layerColor,
+                            fillColor: layerColor,
+                            fillOpacity: 0.4,
+                            weight: 2.5,
+                            opacity: 0.8
+                        };
+                    },
+                    pointToLayer: function(feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 6,
+                            fillColor: layerColor,
+                            color: "#ffffff",
+                            weight: 1.5,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function (feature, layer) {
+                        if (feature.properties) {
+                            let popupContent = '<table style="border-collapse: collapse; font-family: sans-serif; font-size: 12px;">';
+                            for (const [key, value] of Object.entries(feature.properties)) {
+                                popupContent += `<tr><td style="padding: 4px; font-weight: bold; border-bottom: 1px solid #eee; color: #555;">${key} :</td><td style="padding: 4px; border-bottom: 1px solid #eee; color: #000;">${value}</td></tr>`;
+                            }
+                            popupContent += '</table>';
+                            layer.bindPopup(popupContent);
+                        }
+                    }
+                });
+
+                leafletLayer.addTo(map);
+                overlayMaps[layerName] = leafletLayer;
+                bounds.extend(leafletLayer.getBounds());
+            }
+        }
+
+        // Le menu de contrôle affichera également les couches dans un ordre logique
+        L.control.layers({"Carto Voyager": voyager}, overlayMaps, {collapsed: false}).addTo(map);
+
+        if (bounds.isValid()) {
+            map.fitBounds(bounds);
+        }
+    </script>
+</body>
+</html>
